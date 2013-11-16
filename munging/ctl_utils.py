@@ -10,8 +10,8 @@ pip install sklearn
 
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
-import locale
 import numpy as np
+import datetime
 
 def parse_messages(path='dk_message_level_131114.csv'):
     data = pd.read_csv(path,
@@ -44,6 +44,32 @@ def convert_to_int(x):
 		return np.int(x)
 	except:
 		return np.nan
+
+def xldate_as_datetime(xldate):
+    """
+    Convert an Excel number into a Python datetime.datetime
+    This is a stripped-down version of http://stackoverflow.com/a/1109523/1290863
+    """
+    xldays = int(xldate)
+    frac = xldate - xldays
+    seconds = int(round(frac * 86400.0))
+    assert 0 <= seconds <= 86400
+    if seconds == 86400:
+        seconds = 0
+        xldays += 1
+
+    if xldays == 0:
+        # second = seconds % 60; minutes = seconds // 60
+        minutes, second = divmod(seconds, 60)
+        # minute = minutes % 60; hour    = minutes // 60
+        hour, minute = divmod(minutes, 60)
+        return datetime.time(hour, minute, second)
+
+    try:
+        return datetime.datetime.fromordinal(xldays + 693594) + datetime.timedelta(seconds=seconds)
+    except:
+        return np.nan
+
 
 """
 Adds binary flag for each issue
