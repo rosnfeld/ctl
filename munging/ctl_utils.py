@@ -7,34 +7,33 @@ pip install sklearn
 
 """
 
+import crisis.parsers
 
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
+import locale
 import numpy as np
-import datetime
+from datetime import datetime, timedelta
 
 def parse_messages(path='dk_message_level_131114.csv'):
     data = pd.read_csv(path,
-            parse_dates= [4, 7, 8, 9, 23],
-            converters={
-                'm_id': convert_to_int,
-                'c_id': convert_to_int,
-                'profile_id': convert_to_int,
-                'specialist_id': convert_to_int
-            },
+            parse_dates= [7,8,9, 23, 4],
+            converters={ 'm_id' : convert_to_int, 'c_id' : convert_to_int,
+                         'specialist_id' : convert_to_int },
             skiprows=[1],
             )
     return data
 
 def parse_conversations(path='dk_conversation_level_1311114.csv'):
     data = pd.read_csv(path,
-            parse_dates= [7, 8, 9],
-            converters={
-                'm_id': convert_to_int,
-                'c_id': convert_to_int,
-                'profile_id': convert_to_int,
-                'specialist_id': convert_to_int
-            },
+            #parse_dates= [7,8,9],
+            converters={ 'm_id' : convert_to_int, 'c_id' : convert_to_int,
+                         'specialist_id' : convert_to_int,
+                         'conv_start': convert_to_date,
+                         'conv_end': convert_to_date,
+                         'first_msg': convert_to_date,
+                         'last_msg': convert_to_date,
+                         'addedtoqueue': convert_to_date,
+                         'takenfromqueue': convert_to_date},
             skiprows=[1],
             )
     return data
@@ -45,30 +44,14 @@ def convert_to_int(x):
 	except:
 		return np.nan
 
-def xldate_as_datetime(xldate):
-    """
-    Convert an Excel number into a Python datetime.datetime
-    This is a stripped-down version of http://stackoverflow.com/a/1109523/1290863
-    """
-    xldays = int(xldate)
-    frac = xldate - xldays
-    seconds = int(round(frac * 86400.0))
-    assert 0 <= seconds <= 86400
-    if seconds == 86400:
-        seconds = 0
-        xldays += 1
 
-    if xldays == 0:
-        # second = seconds % 60; minutes = seconds // 60
-        minutes, second = divmod(seconds, 60)
-        # minute = minutes % 60; hour    = minutes // 60
-        hour, minute = divmod(minutes, 60)
-        return datetime.time(hour, minute, second)
-
-    try:
-        return datetime.datetime.fromordinal(xldays + 693594) + datetime.timedelta(seconds=seconds)
-    except:
-        return np.nan
+def convert_to_date(x):
+    """Converter for dates.
+    """
+    x = crisis.parsers.caster(x)
+    if not isinstance(x, datetime):
+        x = np.nan
+    return x
 
 
 """
@@ -76,6 +59,7 @@ Adds binary flag for each issue
 
 """
 def add_issue_columns(messages):
+	from sklearn.feature_extraction.text import CountVectorizer
 	v = CountVectorizer(binary=True)
 	issue_matrix = v.fit_transform([str(x) for x in messages['Q13_issues']]).toarray()
 	issues = v.get_feature_names()
@@ -84,10 +68,9 @@ def add_issue_columns(messages):
 
 
 def add_duration_columns(conversations):
-        """
-        Add columns to the Conversations data frame to represent durations:
+        """Add columns to the Conversations data frame to represent durations:
         how long a message spends in the queue, how long the conversation lasts,
-        and how long between a message comes in and the counselor responds.
+        and how long between a message comes in and the conselor responds.
 
         This last value has some issues; in particular, it appears to be off by
         4 hours by default, and even after adjusting by 4 hours, there are many
